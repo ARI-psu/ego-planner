@@ -27,6 +27,9 @@ add_message_files(
   FILES
   Bspline.msg
   DataDisp.msg
+  PVAtrajectory.msg
+  PVAwaypoint.msg
+  PoseCtrlTarget.msg
   )
   
 # Generate added messages and services with any dependencies listed here

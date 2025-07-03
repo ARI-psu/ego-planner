@@ -5,10 +5,16 @@
 #include "std_msgs/Empty.h"
 #include "visualization_msgs/Marker.h"
 #include <ros/ros.h>
+#include <tf/tf.h>
+
+#include "ego_planner/PoseCtrlTarget.h"
 
 ros::Publisher pos_cmd_pub;
+ros::Publisher traj_pub;
 
 quadrotor_msgs::PositionCommand cmd;
+ego_planner::PoseCtrlTarget target_pose;
+
 double pos_gain[3] = {0, 0, 0};
 double vel_gain[3] = {0, 0, 0};
 
@@ -227,6 +233,30 @@ void cmdCallback(const ros::TimerEvent &e)
   last_yaw_ = cmd.yaw;
 
   pos_cmd_pub.publish(cmd);
+
+  // publish tracking target in ControlStack
+  double hover_thrust = 0.709;
+
+  target_pose.header.stamp = time_now;
+  target_pose.header.frame_id = "world";
+  target_pose.pose.position.x = pos(0);
+  target_pose.pose.position.y = pos(1);
+  target_pose.pose.position.z = pos(2);
+
+  target_pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw_yawdot.first);
+
+  target_pose.twist.linear.x = vel(0);
+  target_pose.twist.linear.y = vel(1);
+  target_pose.twist.linear.z = vel(2);
+  target_pose.twist.angular.z = yaw_yawdot.second;
+
+
+  double k_m = hover_thrust / 9.8;
+  target_pose.thrust.x = k_m*acc(0);
+  target_pose.thrust.y = k_m*acc(1);
+  target_pose.thrust.z = k_m*acc(2);
+  traj_pub.publish(target_pose);
+
 }
 
 int main(int argc, char **argv)
@@ -238,8 +268,9 @@ int main(int argc, char **argv)
   ros::Subscriber bspline_sub = node.subscribe("planning/bspline", 10, bsplineCallback);
 
   pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
+  traj_pub = node.advertise<ego_planner::PoseCtrlTarget>("/uav1/tracking_target", 10);
 
-  ros::Timer cmd_timer = node.createTimer(ros::Duration(0.01), cmdCallback);
+  ros::Timer cmd_timer = node.createTimer(ros::Duration(0.05), cmdCallback);
 
   /* control parameter */
   cmd.kx[0] = pos_gain[0];
